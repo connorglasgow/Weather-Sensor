@@ -16,6 +16,7 @@
 #include "gpio.h"
 #include "i2c0.h"
 #include "commandline.h"
+//device driver from manufacturer
 #include "bme280.h"
 
 //----------------------------------------
@@ -39,11 +40,78 @@ uint8_t sensorAdd = 118;
 //----------------------------------------
 //  Functions
 //----------------------------------------
-
-//not actually using this right now
-void initHW()
+void print_sensor_data(struct bme280_data *comp_data)
 {
+    int32_t temp;
+    int32_t press;
+    int32_t hum;
+    char outstr[100];
 
+    temp = 0.01f * comp_data->temperature;
+    press = 0.0001f * comp_data->pressure;
+    hum = 1.0f / 1024.0f * comp_data->humidity;
+
+    sprintf(outstr, "%0.2lf deg C,  %0.2lf hPa, %0.2lf%% \n", temp, press, hum);
+    putsUart0(outstr);
+}
+
+int8_t read_sensor_data(struct bme280_dev *dev)
+{
+    int8_t rslt;
+    uint8_t settings_sel;
+    struct bme280_data comp_data;
+
+    dev->settings.osr_h = BME280_OVERSAMPLING_1X;
+    dev->settings.osr_p = BME280_OVERSAMPLING_1X;
+    dev->settings.osr_t = BME280_OVERSAMPLING_1X;
+    dev->settings.filter = BME280_FILTER_COEFF_OFF;
+
+    settings_sel = BME280_OSR_PRESS_SEL | BME280_OSR_TEMP_SEL
+            | BME280_OSR_HUM_SEL | BME280_FILTER_SEL;
+
+    rslt = bme280_set_sensor_settings(settings_sel, dev);
+    if (rslt != BME280_OK)
+    {
+        putsUart0("Error: set_sensor_settings\n");
+    }
+    putsUart0("Temperature, Pressure, Humdity\n");
+
+    rslt = bme280_set_sensor_mode(BME280_FORCED_MODE, dev);
+    if (rslt != BME280_OK)
+    {
+        putsUart0("Error: set_sensor_mode\n");
+    }
+
+    dev->delay_us(40000, dev->intf_ptr);
+    rslt = bme280_get_sensor_data(BME280_ALL, &comp_data, dev);
+    if (rslt != BME280_OK)
+    {
+        putsUart0("Error: get_sensor_data\n");
+    }
+
+    print_sensor_data(&comp_data);
+    dev->delay_us(1000000, dev->intf_ptr);
+
+    return rslt;
+}
+
+void delay_us(uint32_t period, void *intf_ptr)
+{
+    waitMicrosecond(period);
+}
+
+int8_t i2c_read(uint8_t reg_addr, uint8_t *reg_data, uint32_t len,
+                void *intf_ptr)
+{
+    *reg_data = readI2c0Register(sensorAdd, reg_addr);
+    return 0;
+}
+
+int8_t i2c_write(uint8_t reg_addr, uint8_t *reg_data, uint32_t len,
+                 void *intf_ptr)
+{
+    writeI2c0Register(sensorAdd, reg_addr, reg_data);
+    return 0;
 }
 
 //function yoinked from Dr.Losh's i2c utility program
@@ -60,17 +128,42 @@ uint8_t asciiToUint8(const char str[])
 
 void readTemp()
 {
+    uint8_t msb;
+    uint8_t lsb;
+    uint8_t xsb;
 
+    msb = readI2c0Register(sensorAdd, 250);
+    lsb = readI2c0Register(sensorAdd, 251);
+    xsb = readI2c0Register(sensorAdd, 252);
+
+    waitMicrosecond(100);
 }
 
 void readHumidity()
 {
+    uint8_t msb;
+    uint8_t lsb;
+    uint8_t xsb;
+
+    msb = readI2c0Register(sensorAdd, 250);
+    lsb = readI2c0Register(sensorAdd, 251);
+    xsb = readI2c0Register(sensorAdd, 252);
+
+    waitMicrosecond(100);
 
 }
 
 void readPressure()
 {
+    uint8_t msb;
+    uint8_t lsb;
+    uint8_t xsb;
 
+    msb = readI2c0Register(sensorAdd, 250);
+    lsb = readI2c0Register(sensorAdd, 251);
+    xsb = readI2c0Register(sensorAdd, 252);
+
+    waitMicrosecond(100);
 }
 
 int main(void)
@@ -79,7 +172,6 @@ int main(void)
     initSystemClockTo40Mhz();
     initUart0();
     initI2c0();
-    initHw();
     setUart0BaudRate(115200, 40e6);
 
     //some variables
@@ -91,11 +183,28 @@ int main(void)
     uint16_t data16;
     uint32_t data32;
     uint8_t arg;
+    uint32_t us;
     bool valid;
 
     //initialization stuff for the device
-    DEVICE device;
+    struct bme280_data comp_data;
+    struct bme280_dev dev;
+    int8_t rslt = BME280_OK;
+    uint8_t device_add = BME280_I2C_ADDR_PRIM;
 
+    dev.intf_ptr = &device_add;
+    dev.intf = BME280_I2C_INTF;
+
+    //temp comment for testing
+    dev.read = i2c_read;
+
+    //temp comment out for testing
+    dev.write = i2c_write;
+
+    //temp comment out for testing
+    dev.delay_us = delay_us;
+
+    rslt = bme280_init(&dev);
 
     putsUart0("\nWeather Sensor\n>");
 
@@ -120,11 +229,19 @@ int main(void)
 
                 if (isCommand(&userData, "humidity", 0))
                 {
+                    readHumidity();
                     valid = true;
                 }
 
                 if (isCommand(&userData, "pressure", 0))
                 {
+                    readPressure();
+                    valid = true;
+                }
+
+                if (isCommand(&userData, "read", 0))
+                {
+                    rslt = read_sensor_data(&dev);
                     valid = true;
                 }
 
