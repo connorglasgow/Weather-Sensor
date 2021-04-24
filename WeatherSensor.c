@@ -16,6 +16,7 @@
 #include "gpio.h"
 #include "i2c0.h"
 #include "commandline.h"
+#include "bme280.h"
 
 //----------------------------------------
 // TEMP GLOBAL VARS
@@ -26,14 +27,23 @@ extern bool enterPressed;
 uint8_t sensorAdd = 118;
 
 //----------------------------------------
+//  Data sheet recommended settings
+//----------------------------------------
+/*  for 'weather monitoring' which is what we're doing here
+ *  Sensor mode: forced mode, 1 sample/second
+ *  Oversampling settings: pressure*0, temperature*1,humidity*1
+ *  IIR filter settings: filter off
+ *  should be about a 1Hz data output rate
+ */
+
+//----------------------------------------
 //  Functions
 //----------------------------------------
 
 //not actually using this right now
 void initHW()
 {
-    // Initialize system clock to 40 MHz
-    initSystemClockTo40Mhz();
+
 }
 
 //function yoinked from Dr.Losh's i2c utility program
@@ -53,12 +63,23 @@ void readTemp()
 
 }
 
+void readHumidity()
+{
+
+}
+
+void readPressure()
+{
+
+}
+
 int main(void)
 {
     USER_DATA userData;
     initSystemClockTo40Mhz();
     initUart0();
     initI2c0();
+    initHw();
     setUart0BaudRate(115200, 40e6);
 
     //some variables
@@ -66,11 +87,17 @@ int main(void)
     char *token;
     uint8_t add;
     uint8_t reg;
-    uint8_t data;
+    uint8_t data8;
+    uint16_t data16;
+    uint32_t data32;
     uint8_t arg;
     bool valid;
 
-    putsUart0("Weather Sensor\n>");
+    //initialization stuff for the device
+    DEVICE device;
+
+
+    putsUart0("\nWeather Sensor\n>");
 
     while (true)
     {
@@ -87,9 +114,6 @@ int main(void)
 
                 if (isCommand(&userData, "temperature", 0))
                 {
-                    token = "0x76";
-                    add = asciiToUint8(token);
-
                     readTemp();
                     valid = true;
                 }
@@ -107,9 +131,15 @@ int main(void)
                 //for easy testing purposes
                 else if (isCommand(&userData, "test", 0))
                 {
-                    putsUart0("Showing Address of the BME280: ");
-                    data = readI2c0Register(sensorAdd, 208);
-                    sprintf(outstr, "data is 0x%x or %u\n", data, data);
+                    putsUart0(
+                            "Showing ID of the BME280 from the \"id\" register\n");
+                    data8 = readI2c0Register(sensorAdd, 208);
+                    data16 = readI2c0Register(sensorAdd, 208);
+                    data32 = readI2c0Register(sensorAdd, 208);
+                    sprintf(outstr, "data is 0x%x or %u\n"
+                            "add is 0x%x or %u\n"
+                            "register is 0x%x or %u\n",
+                            data8, data8, sensorAdd, sensorAdd, 208, 208);
                     putsUart0(outstr);
 
                     valid = true;
@@ -123,7 +153,7 @@ int main(void)
                     valid = true;
                 }
 
-                //will let the user know if the command they entered didnt exist
+                //will let the user know if the command they entered doesn't exist
                 if (!valid)
                 {
                     putsUart0("Invalid command\n\r");
