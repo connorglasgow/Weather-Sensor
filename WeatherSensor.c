@@ -9,102 +9,115 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
+#include "clock.h"
 #include "tm4c123gh6pm.h"
 #include "uart0.h"
-#include "adc0.h"
 #include "wait.h"
 #include "gpio.h"
+#include "i2c0.h"
 #include "commandline.h"
-
-//define pinouts
-#define COMPARATOR PORTC,7
-#define MEAS_LR PORTA,7
-#define MEAS_C  PORTA,6
-#define HIGHSIDE_R PORTA,5
-#define LOWSIDE_R PORTA,2
-#define INTEGRATE PORTA,3
-
-//analog input for ADC stuff
-#define AIN1 PORTE,2
-
-//defines for commandline interface
-#define MAX_CHARS 80
-#define MAX_FIELDS 5
-
-//'state machine' for interfacing with which measurement is taken
-//also possibly for AUTO command
-typedef enum _STATE
-{
-    resistance, capacitance, inductance, none
-} STATE;
 
 //----------------------------------------
 // TEMP GLOBAL VARS
 //----------------------------------------
-//for time values for measuring components
-uint32_t time = 0;
 //for commandline interface
 extern bool enterPressed;
-STATE state;
-//for sprintf stuff
-char outstr[100];
+//hardcoded i2c address for sensor
+uint8_t sensorAdd = 118;
 
 //----------------------------------------
 //  Functions
 //----------------------------------------
 
+//not actually using this right now
 void initHW()
 {
     // Initialize system clock to 40 MHz
     initSystemClockTo40Mhz();
+}
 
-    //init I2C
-    initI2c0();
+//function yoinked from Dr.Losh's i2c utility program
+//used to read and write hex or decimal address
+uint8_t asciiToUint8(const char str[])
+{
+    uint8_t data;
+    if (str[0] == '0' && tolower(str[1]) == 'x')
+        sscanf(str, "%hhx", &data);
+    else
+        sscanf(str, "%hhu", &data);
+    return data;
+}
 
-    // Enable clocks
-    //enablePort(?????);
-
-    // Configure pins
-    //selectPinPushPullOutput(?????);
+void readTemp()
+{
 
 }
 
 int main(void)
 {
-    USER_DATA data;
-    initHW();
+    USER_DATA userData;
+    initSystemClockTo40Mhz();
     initUart0();
+    initI2c0();
     setUart0BaudRate(115200, 40e6);
-    putsUart0("\n>");
 
+    //some variables
+    char outstr[100];
+    char *token;
+    uint8_t add;
+    uint8_t reg;
+    uint8_t data;
+    uint8_t arg;
     bool valid;
+
+    putsUart0("Weather Sensor\n>");
+
     while (true)
     {
         if (kbhitUart0())
         {
             //process command
-            getsUart0(&data);
+            getsUart0(&userData);
             if (enterPressed)
             {
                 enterPressed = false;
-                parseFields(&data);
+                parseFields(&userData);
 
                 valid = false;
 
-                if (isCommand(&data, "temperature", 0))
+                if (isCommand(&userData, "temperature", 0))
+                {
+                    token = "0x76";
+                    add = asciiToUint8(token);
+
+                    readTemp();
+                    valid = true;
+                }
+
+                if (isCommand(&userData, "humidity", 0))
+                {
+                    valid = true;
+                }
+
+                if (isCommand(&userData, "pressure", 0))
                 {
                     valid = true;
                 }
 
                 //for easy testing purposes
-                else if (isCommand(&data, "test", 0))
+                else if (isCommand(&userData, "test", 0))
                 {
+                    putsUart0("Showing Address of the BME280: ");
+                    data = readI2c0Register(sensorAdd, 208);
+                    sprintf(outstr, "data is 0x%x or %u\n", data, data);
+                    putsUart0(outstr);
+
                     valid = true;
                 }
 
                 //classic help command, will give the user instructions
                 //on how to use the utility
-                else if (isCommand(&data, "help", 0))
+                else if (isCommand(&userData, "help", 0))
                 {
 
                     valid = true;

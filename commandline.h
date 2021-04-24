@@ -25,5 +25,6 @@ void parseFields(USER_DATA* userdata);
 bool isCommand(USER_DATA* userdata, const char strCommand[], uint8_t minArgs);
 int32_t getFieldInteger(USER_DATA* userdata, uint8_t fieldNumber);
 char* getFieldString(USER_DATA* userdata, uint8_t fieldNumber);
+bool stringcomp(const char str1[], const char str2[]);
 
 #endif /* COMMANDLINE_H_ */
