@@ -40,16 +40,56 @@ uint8_t sensorAdd = 118;
 //----------------------------------------
 //  Functions
 //----------------------------------------
+void read_registers(struct bme280_uncomp_data *uncomp_data)
+{
+    uint8_t temporary;
+    uint8_t reg_data0;
+    uint8_t reg_data1;
+    uint8_t reg_data2;
+    uint32_t data_xlsb;
+    uint32_t data_lsb;
+    uint32_t data_msb;
+    uint32_t final;
+
+    char outstr[100];
+    //read humidity
+    reg_data0 = readI2c0Register(sensorAdd, 254);
+    reg_data1 = readI2c0Register(sensorAdd, 253);
+    data_msb = reg_data1 << 8;
+    data_lsb = reg_data0 ;
+    final = data_msb | data_lsb;
+    uncomp_data->humidity = final;
+
+    //read temp
+    reg_data0 = readI2c0Register(sensorAdd, 252);
+    reg_data1 = readI2c0Register(sensorAdd, 251);
+    reg_data2 = readI2c0Register(sensorAdd, 250);
+    data_msb = reg_data2 << 12;
+    data_lsb = reg_data1 << 4;
+    data_xlsb = reg_data0 >> 4;
+    final = data_msb | data_lsb | data_xlsb;
+    uncomp_data->temperature = final;
+
+    //read pressure
+    reg_data0 = readI2c0Register(sensorAdd, 249);
+    reg_data1 = readI2c0Register(sensorAdd, 248);
+    reg_data2 = readI2c0Register(sensorAdd, 247);
+    data_msb = reg_data2 << 12;
+    data_lsb = reg_data1 << 4;
+    data_xlsb = reg_data0 >> 4;
+    final = data_msb | data_lsb | data_xlsb;
+    uncomp_data->pressure = final;
+}
 void print_sensor_data(struct bme280_data *comp_data)
 {
-    int32_t temp;
-    int32_t press;
-    int32_t hum;
+    double temp;
+    double press;
+    double hum;
     char outstr[100];
 
-    temp = 0.01f * comp_data->temperature;
-    press = 0.0001f * comp_data->pressure;
-    hum = 1.0f / 1024.0f * comp_data->humidity;
+    temp = 0.01 * comp_data->temperature;
+    press = 0.0001 * comp_data->pressure;
+    hum = 1.0 / 1024.0 * comp_data->humidity;
 
     sprintf(outstr, "%0.2lf deg C,  %0.2lf hPa, %0.2lf%% \n", temp, press, hum);
     putsUart0(outstr);
@@ -60,6 +100,7 @@ int8_t read_sensor_data(struct bme280_dev *dev)
     int8_t rslt;
     uint8_t settings_sel;
     struct bme280_data comp_data;
+    struct bme280_uncomp_data uncomp_data;
 
     dev->settings.osr_h = BME280_OVERSAMPLING_1X;
     dev->settings.osr_p = BME280_OVERSAMPLING_1X;
@@ -83,11 +124,14 @@ int8_t read_sensor_data(struct bme280_dev *dev)
     }
 
     dev->delay_us(40000, dev->intf_ptr);
-    rslt = bme280_get_sensor_data(BME280_ALL, &comp_data, dev);
+    //rslt = bme280_get_sensor_data(BME280_ALL, &comp_data, dev);
+    read_registers(&uncomp_data);
     if (rslt != BME280_OK)
     {
         putsUart0("Error: get_sensor_data\n");
     }
+
+    rslt = bme280_compensate_data(BME280_ALL, &uncomp_data, &comp_data, &dev->calib_data) ;
 
     print_sensor_data(&comp_data);
     dev->delay_us(1000000, dev->intf_ptr);
@@ -128,42 +172,17 @@ uint8_t asciiToUint8(const char str[])
 
 void readTemp()
 {
-    uint8_t msb;
-    uint8_t lsb;
-    uint8_t xsb;
 
-    msb = readI2c0Register(sensorAdd, 250);
-    lsb = readI2c0Register(sensorAdd, 251);
-    xsb = readI2c0Register(sensorAdd, 252);
-
-    waitMicrosecond(100);
 }
 
 void readHumidity()
 {
-    uint8_t msb;
-    uint8_t lsb;
-    uint8_t xsb;
-
-    msb = readI2c0Register(sensorAdd, 250);
-    lsb = readI2c0Register(sensorAdd, 251);
-    xsb = readI2c0Register(sensorAdd, 252);
-
-    waitMicrosecond(100);
 
 }
 
 void readPressure()
 {
-    uint8_t msb;
-    uint8_t lsb;
-    uint8_t xsb;
 
-    msb = readI2c0Register(sensorAdd, 250);
-    lsb = readI2c0Register(sensorAdd, 251);
-    xsb = readI2c0Register(sensorAdd, 252);
-
-    waitMicrosecond(100);
 }
 
 int main(void)
