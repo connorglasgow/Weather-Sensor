@@ -242,13 +242,8 @@ int main(void)
     dev.intf_ptr = &device_add;
     dev.intf = BME280_I2C_INTF;
 
-    //temp comment for testing
     dev.read = i2c_read;
-
-    //temp comment out for testing
     dev.write = i2c_write;
-
-    //temp comment out for testing
     dev.delay_us = delay_us;
 
     rslt = bme280_init(&dev);
@@ -288,7 +283,7 @@ int main(void)
 
                 if (isCommand(&userData, "read", 0))
                 {
-                    rslt = read_sensor_data(&dev,comp_data);
+                    rslt = read_sensor_data(&dev);
                     valid = true;
                 }
 
@@ -298,8 +293,6 @@ int main(void)
                     putsUart0(
                             "Showing ID of the BME280 from the \"id\" register\n");
                     data8 = readI2c0Register(sensorAdd, 208);
-                    //data16 = readI2c0Register(sensorAdd, 208);
-                    //data32 = readI2c0Register(sensorAdd, 208);
                     sprintf(outstr, "data is 0x%x or %u\n"
                             "add is 0x%x or %u\n"
                             "register is 0x%x or %u\n",
