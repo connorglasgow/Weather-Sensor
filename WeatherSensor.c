@@ -288,7 +288,7 @@ int main(void)
 
                 if (isCommand(&userData, "read", 0))
                 {
-                    rslt = read_sensor_data(&dev);
+                    rslt = read_sensor_data(&dev,comp_data);
                     valid = true;
                 }
 
