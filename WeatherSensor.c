@@ -56,7 +56,7 @@ void read_registers(struct bme280_uncomp_data *uncomp_data)
     reg_data0 = readI2c0Register(sensorAdd, 254);
     reg_data1 = readI2c0Register(sensorAdd, 253);
     data_msb = reg_data1 << 8;
-    data_lsb = reg_data0 ;
+    data_lsb = reg_data0;
     final = data_msb | data_lsb;
     uncomp_data->humidity = final;
 
@@ -80,19 +80,61 @@ void read_registers(struct bme280_uncomp_data *uncomp_data)
     final = data_msb | data_lsb | data_xlsb;
     uncomp_data->pressure = final;
 }
-void print_sensor_data(struct bme280_data *comp_data)
+
+void calibrate_data(struct bme280_uncomp_data *uncomp_data,
+                    struct bme280_data *comp_data)
 {
-    double temp;
-    double press;
-    double hum;
+    double temporary;
+
+    temporary = uncomp_data->temperature;
+    temporary = temporary * 3 / 22052;
+    comp_data->temperature = temporary;
+
+    temporary = uncomp_data->pressure;
+    temporary = 0.00195293 * temporary;
+    comp_data->pressure = temporary;
+
+    temporary = uncomp_data->humidity;
+    temporary = temporary * 26 / 13851 ;
+    comp_data->humidity = temporary;
+}
+
+void print_sensor_data(struct bme280_data *comp_data,
+                       struct bme280_uncomp_data *uncomp_data, bool raw)
+{
     char outstr[100];
 
-    temp = 0.01 * comp_data->temperature;
-    press = 0.0001 * comp_data->pressure;
-    hum = 1.0 / 1024.0 * comp_data->humidity;
+    if (raw)
+    {
+        uint32_t temp;
+        uint32_t press;
+        uint32_t hum;
+        temp = uncomp_data->temperature;
+        press = uncomp_data->pressure;
+        hum = uncomp_data->humidity;
 
-    sprintf(outstr, "%0.2lf deg C,  %0.2lf hPa, %0.2lf%% \n", temp, press, hum);
-    putsUart0(outstr);
+        putsUart0("Raw Data:\n");
+        sprintf(outstr, "Temperature = %u\n"
+                "Pressure = %u\n"
+                "Humidity = %u\n",
+                temp, press, hum);
+        putsUart0(outstr);
+    }
+    else
+    {
+        double temp;
+        double press;
+        double hum;
+        temp = comp_data->temperature;
+        press = comp_data->pressure;
+        hum = comp_data->humidity;
+
+        sprintf(outstr, "%0.2lf deg F\n"
+                "%0.2lf hPa\n"
+                "%0.2lf%% \n",
+                temp, press, hum);
+        putsUart0(outstr);
+    }
 }
 
 int8_t read_sensor_data(struct bme280_dev *dev)
@@ -131,10 +173,11 @@ int8_t read_sensor_data(struct bme280_dev *dev)
         putsUart0("Error: get_sensor_data\n");
     }
 
-    rslt = bme280_compensate_data(BME280_ALL, &uncomp_data, &comp_data, &dev->calib_data) ;
-
-    print_sensor_data(&comp_data);
-    dev->delay_us(1000000, dev->intf_ptr);
+    //rslt = bme280_compensate_data(BME280_ALL, &uncomp_data, &comp_data, &dev->calib_data) ;
+    calibrate_data(&uncomp_data, &comp_data);
+    print_sensor_data(&comp_data, &uncomp_data, 1);
+    print_sensor_data(&comp_data, &uncomp_data, 0);
+    //dev->delay_us(1000000, dev->intf_ptr);
 
     return rslt;
 }
@@ -168,21 +211,6 @@ uint8_t asciiToUint8(const char str[])
     else
         sscanf(str, "%hhu", &data);
     return data;
-}
-
-void readTemp()
-{
-
-}
-
-void readHumidity()
-{
-
-}
-
-void readPressure()
-{
-
 }
 
 int main(void)
@@ -242,19 +270,19 @@ int main(void)
 
                 if (isCommand(&userData, "temperature", 0))
                 {
-                    readTemp();
+                    //readTemp();
                     valid = true;
                 }
 
                 if (isCommand(&userData, "humidity", 0))
                 {
-                    readHumidity();
+                    //readHumidity();
                     valid = true;
                 }
 
                 if (isCommand(&userData, "pressure", 0))
                 {
-                    readPressure();
+                    //readPressure();
                     valid = true;
                 }
 
@@ -270,8 +298,8 @@ int main(void)
                     putsUart0(
                             "Showing ID of the BME280 from the \"id\" register\n");
                     data8 = readI2c0Register(sensorAdd, 208);
-                    data16 = readI2c0Register(sensorAdd, 208);
-                    data32 = readI2c0Register(sensorAdd, 208);
+                    //data16 = readI2c0Register(sensorAdd, 208);
+                    //data32 = readI2c0Register(sensorAdd, 208);
                     sprintf(outstr, "data is 0x%x or %u\n"
                             "add is 0x%x or %u\n"
                             "register is 0x%x or %u\n",
